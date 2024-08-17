@@ -9,25 +9,55 @@ if (mwse.buildDate == nil) or (mwse.buildDate < 20200521) then
 end
 --]]
 
-local saveData
 local divineMarkers = {}
 local almsiviMarkers = {}
 
-local function findClosestReference(effectId)
-    local cell = tes3.mobilePlayer.cell
-    local lastPos = tes3vector3.new(saveData.lastPos.x, saveData.lastPos.y)
-    -- Check cells for position override (guild guides, Mournhold?)
+local function findClosestExteriorPos()
+    -- Breadth first search
+    local explored = {[tes3.mobilePlayer.cell.id] = true}
+    local cellQueue = {tes3.mobilePlayer.cell}
+    local positionQueue = {tes3.mobilePlayer.position}
 
+    while cellQueue[1] do
+        local cell = table.remove(cellQueue, 1)
+        local pos = table.remove(positionQueue, 1)
+
+        -- Search is done once we find an exterior
+        if (not cell.isInterior) then
+            return pos
+        end
+
+        for door in cell.iterateReferences(tes3.objectType.door) do
+            if (door.destination) then
+                if (not explored[door.destination.cell.id]) then
+                    explored[door.destination.cell.id] = true
+                    cellQueue.insert(door.destination.cell)
+                    positionQueue.insert(door.destination.marker.position)
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function findClosestReference(effectId)
     local markers
     if (effectId == tes3.effect.divineIntervention) then
         markers = divineMarkers
-    else if (effectId == tes3.effect.almsiviIntervention) then
+    elseif (effectId == tes3.effect.almsiviIntervention) then
         markers = almsiviMarkers
     else
         return nil
     end
 
-    table.sort(markers, 
+    -- TODO Mournhold override
+    local lastPos = findClosestExteriorPos()
+    if (not lastPos) then
+        return nil
+    end
+
+    table.sort(markers,
         function(a, b)
             return lastPos:distanceXY(a.position) < lastPos:distanceXY(b.position)
         end
@@ -37,43 +67,30 @@ local function findClosestReference(effectId)
 end
 
 local function teleportTick(e)
-    local teleportDisabled = tes3.worldController.flagTeleportingDisabled
 
-    if (e.effectId == tes3.effect.mark and saveData.lastPos) then
-        -- Store mark position
-        saveData.markPos = saveData.lastPos
-        return true
-    end
-
-    if (e.effectId == tes3.effect.recall and not teleportDisabled and saveData.markPos) then
-        -- Retrieve mark position
-        saveData.lastPos = saveData.markPos
-        return true
-    end
-
-    if (e.effectId != tes3.effect.divineIntervention and e.effectId != tes3.effect.almsiviIntervention) then
+    if (e.effectId ~= tes3.effect.divineIntervention and e.effectId ~= tes3.effect.almsiviIntervention) then
         -- Only intercept interventions
         return true
     end
 
-    if (teleportDisabled) then
+    if (tes3.worldController.flagTeleportingDisabled) then
         -- Fall back to default behavior when teleportation is disabled
         return true
     end
 
-    local reference = tes3.findClosestReference(e.effectID)
+    local reference = findClosestReference(e.effectID)
 
-    if (reference) then
-        tes3.positionCell({
-            reference = tes3.player,
-            position = reference.position,
-            orientation = reference.orientation,
-            cell = reference.cell
-        })
-    else
-        -- Fall back to default behavior if we can't find a reference
+    if (not reference) then
+        -- Fall back to default behavior if we can't find a marker
         return true
     end
+
+    tes3.positionCell({
+        reference = tes3.player,
+        position = reference.position,
+        orientation = reference.orientation,
+        cell = reference.cell
+    })
 
     -- Suppress default behavior if we're successful
     e.effectInstance.state = tes3.spellState.retired
@@ -82,37 +99,21 @@ end
 
 event.register(tes3.event.spellTick, teleportTick)
 
--- Unfortunately getLastExteriorPosition isn't actually the last exterior position...
-local function onSimulate(e)
-    if (tes3dataHandler.currentCell.isInterior)
-        if (not saveData.pos) then
-            local pos = getLastExteriorPosition()
-            saveData.lastPos.x = pos.x
-            saveData.lastPos.y = pos.y
-        end
-        return
-    end
-
-    local pos = tes3.mobilePlayer.position
-    saveData.lastPos.x = pos.x
-    saveData.lastPos.y = pos.y
-end
-
-event.register(tes3.event.simulate, onSimulate)
-
 local function onInitialize(e)
     -- TODO figure these out
     local divineMarkerId
     local almsiviMarkerId
-    for _, cell in ipairs(tes3dataHandler.tes3nonDynamicData.cells) do
-        -- TODO filter object type
-        for ref in cell.iterateReferences() do
-            -- Assuming it's faster to check a bool before doing string comparison
-            if (ref.isLocationMarker) then 
-                if (ref.object.id == divineMarkerId) then
-                    table.insert(divineMarkers, ref)
-                else if (ref.object.id == almsiviMarkerId) then
-                    table.insert(almsiviMarkers, ref)
+    for _, cell in ipairs(tes3.dataHandler.nonDynamicData.cells) do
+        -- TODO check if object type is correct
+        if (not cell.isInterior) then
+            for ref in cell.iterateReferences(tes3.objectType.tes3static) do
+                -- Assuming it's faster to check a bool before doing string comparison
+                if (ref.isLocationMarker) then 
+                    if (ref.object.id == divineMarkerId) then
+                        table.insert(divineMarkers, ref)
+                    elseif (ref.object.id == almsiviMarkerId) then
+                        table.insert(almsiviMarkers, ref)
+                    end
                 end
             end
         end
@@ -120,9 +121,3 @@ local function onInitialize(e)
 end
 
 event.register(tes3.event.initialized, onInitialize)
-
-local function onLoad(e)
-    saveData = tes3.player.data.cartesianIntervention
-end
-
-event.register(tes3.event.loaded, onLoad)
