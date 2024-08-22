@@ -18,7 +18,7 @@ local function findClosestExteriorPos()
             return pos
         end
 
-        for door in cell.iterateReferences(tes3.objectType.door) do
+        for door in cell:iterateReferences(tes3.objectType.door) do
             if (door.destination) then
                 if (not explored[door.destination.cell.id]) then
                     explored[door.destination.cell.id] = true
@@ -44,10 +44,8 @@ local function findClosestReference(effectId)
 
     local lastPos = findClosestExteriorPos()
     if (not lastPos) then
-        -- TODO Mournhold override here?
-        -- e.g. check if player cell is form Tribunal.esm
-        -- Fall back to Vanilla behavior
-        return tes3.getLastExteriorPosition()
+        -- Tribunal DLC intervention seems to be hardcoded, so no special override required
+        lastPos =  tes3.getLastExteriorPosition()
     end
 
     table.sort(markers,
@@ -60,7 +58,6 @@ local function findClosestReference(effectId)
 end
 
 local function interventionTick(e)
-
     if (e.effectId ~= tes3.effect.divineIntervention and e.effectId ~= tes3.effect.almsiviIntervention) then
         -- Only intercept interventions
         return true
@@ -71,7 +68,7 @@ local function interventionTick(e)
         return true
     end
 
-    local reference = findClosestReference(e.effectID)
+    local reference = findClosestReference(e.effectId)
 
     if (not reference) then
         -- Fall back to default behavior if we can't find a marker
@@ -93,9 +90,10 @@ end
 event.register(tes3.event.spellTick, interventionTick)
 
 local function findMarkers(e)
-    for _, cell in ipairs(tes3.dataHandler.nonDynamicData.cells) do
+
+    for _, cell in pairs(tes3.dataHandler.nonDynamicData.cells) do
         if (not cell.isInterior) then
-            for ref in cell.iterateReferences(tes3.objectType.tes3static) do
+            for ref in cell:iterateReferences(tes3.objectType.static) do
                 -- Assuming it's faster to check a bool before doing string comparison
                 if (ref.isLocationMarker) then
                     if (ref.object.id == "DivineMarker") then
