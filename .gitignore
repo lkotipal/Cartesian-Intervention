@@ -39,3 +39,10 @@ luac.out
 *.x86_64
 *.hex
 
+# MWSE
+meta.ini
+.vscode/
+MWSE/core/*
+MWSE/config/readme.txt
+MWSE/lib/readme.txt
+MWSE/mods/readme.txt
