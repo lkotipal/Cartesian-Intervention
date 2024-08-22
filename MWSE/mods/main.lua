@@ -1,7 +1,7 @@
 -- TODO check MWSE version we want
 
 local divineMarkers = {}
-local almsiviMarkers = {}
+local templeMarkers = {}
 
 -- Breadth first search of doors to find closest exterior
 local function findClosestExteriorPos()
@@ -37,7 +37,7 @@ local function findClosestReference(effectId)
     if (effectId == tes3.effect.divineIntervention) then
         markers = divineMarkers
     elseif (effectId == tes3.effect.almsiviIntervention) then
-        markers = almsiviMarkers
+        markers = templeMarkers
     else
         return nil
     end
@@ -93,19 +93,15 @@ end
 event.register(tes3.event.spellTick, interventionTick)
 
 local function findMarkers(e)
-    -- TODO figure these out
-    local divineMarkerId
-    local almsiviMarkerId
     for _, cell in ipairs(tes3.dataHandler.nonDynamicData.cells) do
         if (not cell.isInterior) then
-            -- TODO check if object type is correct
             for ref in cell.iterateReferences(tes3.objectType.tes3static) do
                 -- Assuming it's faster to check a bool before doing string comparison
                 if (ref.isLocationMarker) then
-                    if (ref.object.id == divineMarkerId) then
+                    if (ref.object.id == "DivineMarker") then
                         table.insert(divineMarkers, ref)
-                    elseif (ref.object.id == almsiviMarkerId) then
-                        table.insert(almsiviMarkers, ref)
+                    elseif (ref.object.id == "TempleMarker") then
+                        table.insert(templeMarkers, ref)
                     end
                 end
             end
