@@ -1,19 +1,10 @@
--- Make sure we have an up-to-date version of MWSE.
---[[
-if (mwse.buildDate == nil) or (mwse.buildDate < 20200521) then
-    event.register("initialized", function()
-        tes3.messageBox("[Daedric Intervention] Your MWSE is out of date!" ..
-                            " You will need to update to a more recent version to use this mod.")
-    end)
-    return
-end
---]]
+-- TODO check MWSE version we want
 
 local divineMarkers = {}
 local almsiviMarkers = {}
 
+-- Breadth first search of doors to find closest exterior
 local function findClosestExteriorPos()
-    -- Breadth first search
     local explored = {[tes3.mobilePlayer.cell.id] = true}
     local cellQueue = {tes3.mobilePlayer.cell}
     local positionQueue = {tes3.mobilePlayer.position}
@@ -51,10 +42,12 @@ local function findClosestReference(effectId)
         return nil
     end
 
-    -- TODO Mournhold override
     local lastPos = findClosestExteriorPos()
     if (not lastPos) then
-        return nil
+        -- TODO Mournhold override here?
+        -- e.g. check if player cell is form Tribunal.esm
+        -- Fall back to Vanilla behavior
+        return tes3.getLastExteriorPosition()
     end
 
     table.sort(markers,
@@ -63,10 +56,10 @@ local function findClosestReference(effectId)
         end
     )
 
-    return table[1]
+    return markers[1]
 end
 
-local function teleportTick(e)
+local function interventionTick(e)
 
     if (e.effectId ~= tes3.effect.divineIntervention and e.effectId ~= tes3.effect.almsiviIntervention) then
         -- Only intercept interventions
@@ -97,18 +90,18 @@ local function teleportTick(e)
     return false
 end
 
-event.register(tes3.event.spellTick, teleportTick)
+event.register(tes3.event.spellTick, interventionTick)
 
-local function onInitialize(e)
+local function findMarkers(e)
     -- TODO figure these out
     local divineMarkerId
     local almsiviMarkerId
     for _, cell in ipairs(tes3.dataHandler.nonDynamicData.cells) do
-        -- TODO check if object type is correct
         if (not cell.isInterior) then
+            -- TODO check if object type is correct
             for ref in cell.iterateReferences(tes3.objectType.tes3static) do
                 -- Assuming it's faster to check a bool before doing string comparison
-                if (ref.isLocationMarker) then 
+                if (ref.isLocationMarker) then
                     if (ref.object.id == divineMarkerId) then
                         table.insert(divineMarkers, ref)
                     elseif (ref.object.id == almsiviMarkerId) then
@@ -120,4 +113,4 @@ local function onInitialize(e)
     end
 end
 
-event.register(tes3.event.initialized, onInitialize)
+event.register(tes3.event.initialized, findMarkers)
