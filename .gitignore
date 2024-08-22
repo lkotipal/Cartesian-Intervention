@@ -43,6 +43,7 @@ luac.out
 meta.ini
 .vscode/
 MWSE/core/*
+MWSE/core.mohidden/*
 MWSE/config/readme.txt
 MWSE/lib/readme.txt
 MWSE/mods/readme.txt
