@@ -60,27 +60,33 @@ end
 local function interventionTick(e)
     if (e.effectId ~= tes3.effect.divineIntervention and e.effectId ~= tes3.effect.almsiviIntervention) then
         -- Only intercept interventions
-        return true
+        return
     end
 
     if (tes3.worldController.flagTeleportingDisabled) then
         -- Fall back to default behavior when teleportation is disabled
-        return true
+        return
     end
 
     local reference = findClosestReference(e.effectId)
 
     if (not reference) then
         -- Fall back to default behavior if we can't find a marker
-        return true
+        return
     end
 
     tes3.positionCell({
         reference = tes3.player,
+        cell = reference.cell,
         position = reference.position,
-        orientation = reference.orientation,
-        cell = reference.cell
+        -- accurate to vanilla behavior
+        -- orientation = reference.orientation,
+        suppressFader = true
     })
+    -- Vanilla intervention plays sound while loading the cell
+    -- But with playSound the sound is interrupted by loading
+    -- Playing after is less annoying
+    tes3.playSound({sound = "mysticism hit"})
 
     -- Suppress default behavior if we're successful
     e.effectInstance.state = tes3.spellState.retired
